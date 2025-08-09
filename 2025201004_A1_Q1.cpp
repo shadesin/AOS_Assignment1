@@ -1,128 +1,229 @@
-#include <fcntl.h>      // open
-#include <unistd.h>     // read, write, lseek, close, _exit
-#include <sys/stat.h>   // mkdir
-#include <errno.h>      // errno
-#include <sys/mman.h>   // mmap, munmap
-#include <sys/types.h>  // size_t, off_t
+#include <fcntl.h>       // open, O_*
+#include <unistd.h>      // read, write, lseek, close, _exit
+#include <sys/stat.h>    // mkdir
+#include <errno.h>       // errno
+#include <sys/mman.h>    // mmap, munmap
+#include <sys/types.h>   // off_t
 
-// Manual strlen using only pointer math
-size_t my_strlen(const char* s) {
-    size_t len = 0;
-    while (s[len] != '\0') len++;
-    return len;
+// Compute string length without libc
+int strLength(const char* str) {
+    int length = 0;
+    while (str[length] != '\0') {
+        length++;
+    }
+    return length;
 }
 
-// Manual string to integer (positive only for block size & flag)
-int strToInt(const char* s) {
-    int val = 0;
-    int i = 0;
-    if(s[0] == '-') return -1; // simple negative detect
-    while (s[i] >= '0' && s[i] <= '9') {
-        val = val * 10 + (s[i] - '0');
+// Convert string to positive integer; return -1 if invalid
+int convertToInt(const char* str) {
+    int result = 0, i = 0;
+    if (str[0] == '-') return -1;
+    while (str[i]) {
+        if (str[i] < '0' || str[i] > '9') return -1;
+        result = result * 10 + (str[i] - '0');
         i++;
     }
-    if (s[i] != '\0') return -1; // invalid char
-    return val;
+    return result;
 }
 
-void writeStr(int fd, const char* s) {
-    write(fd, s, my_strlen(s));
+// Write zero-terminated string to fd
+void fdWriteStr(int fd, const char* str) {
+    write(fd, str, strLength(str));
 }
 
-void writeInt(int fd, int num) {
-    char buf[12];
-    int i = 10; buf[11] = '\0';
-    if (num == 0) { buf[10] = '0'; write(fd, buf+10, 1); return; }
-    bool neg = false;
-    if (num < 0) { neg = true; num = -num; }
-    while(num > 0 && i>=0) { buf[i--] = '0'+(num%10); num/=10; }
-    if (neg && i>=0) buf[i--] = '-';
-    write(fd, buf+i+1, 11-i-1);
+// Write integer to fd as decimal digits
+void fdWriteInt(int fd, int number) {
+    char buffer[12];
+    int index = 10;
+    buffer[11] = '\0';
+    if (number == 0) {
+        write(fd, "0", 1);
+        return;
+    }
+    bool negative = false;
+    if (number < 0) {
+        negative = true;
+        number = -number;
+    }
+    while (number > 0 && index >= 0) {
+        buffer[index--] = '0' + (number % 10);
+        number /= 10;
+    }
+    if (negative && index >= 0) {
+        buffer[index--] = '-';
+    }
+    write(fd, buffer + index + 1, 10 - index);
 }
 
-void usage() {
-    writeStr(2,"Usage:\n");
-    writeStr(2,"./q1 <input> 0 <block>\n");
+void printInstructions() {
+    fdWriteStr(2, "Usage:\n");
+    fdWriteStr(2, "./q1 <input_file> 0 <block_size>\n");
+    fdWriteStr(2, "./q1 <input_file> 1\n");
+    fdWriteStr(2, "./q1 <input_file> 2 <start_index> <end_index>\n");
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) { usage(); _exit(1); }
-
-    int flag = strToInt(argv[2]);
-    if (flag != 0) {
-        writeStr(2,"Only flag 0 implemented\n");
+    if (argc < 3) {
+        printInstructions();
         _exit(1);
     }
 
-    int blockSize = strToInt(argv[3]);
+    const char* inputFile = argv[1];
+    int mode = convertToInt(argv[2]);
+
+    if (mode != 0) {
+        fdWriteStr(2, "Error: This version supports only mode 0 (block-wise reversal).\n");
+        printInstructions();
+        _exit(1);
+    }
+
+    if (argc != 4) {
+        fdWriteStr(2, "Error: Flag 0 requires a block size argument.\n");
+        printInstructions();
+        _exit(1);
+    }
+
+    int blockSize = convertToInt(argv[3]);
     if (blockSize <= 0) {
-        writeStr(2,"Invalid block size\n");
+        fdWriteStr(2, "Error: Block size must be a positive integer.\n");
+        _exit(1);
+    }
+    if (blockSize > 8 * 1024 * 1024) {
+        fdWriteStr(2, "Warning: Block size exceeds 8MB, which might be inefficient.\n");
+    }
+
+    // Create output directory
+    if (mkdir("Assignment1", 0700) == -1 && errno != EEXIST) {
+        fdWriteStr(2, "Failed to create directory 'Assignment1'.\n");
         _exit(1);
     }
 
-    // mkdir
-    if (mkdir("Assignment1",0700) == -1 && errno != EEXIST) {
-        writeStr(2,"mkdir failed\n");
+    // Open input file
+    int fd_in = open(inputFile, O_RDONLY);
+    if (fd_in == -1) {
+        fdWriteStr(2, "Could not open input file.\n");
         _exit(1);
     }
 
-    // open input
-    int in_fd = open(argv[1], O_RDONLY);
-    if (in_fd == -1) { writeStr(2,"input open fail\n"); _exit(1); }
+    // Open output file
+    int fd_out = open("Assignment1/output_file", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    if (fd_out == -1) {
+        fdWriteStr(2, "Could not open or create output file.\n");
+        close(fd_in);
+        _exit(1);
+    }
 
-    // open output
-    int out_fd = open("Assignment1/output_file", O_CREAT|O_WRONLY|O_TRUNC, 0600);
-    if (out_fd == -1) { writeStr(2,"output open fail\n"); close(in_fd); _exit(1); }
+    // Determine input file size
+    off_t fileSize = lseek(fd_in, 0, SEEK_END);
+    if (fileSize < 0) {
+        fdWriteStr(2, "Failed to determine input file size.\n");
+        close(fd_in);
+        close(fd_out);
+        _exit(1);
+    }
+    if (lseek(fd_in, 0, SEEK_SET) == (off_t)-1) {
+        fdWriteStr(2, "Failed to reset file position to start.\n");
+        close(fd_in);
+        close(fd_out);
+        _exit(1);
+    }
 
-    off_t fileSize = lseek(in_fd, 0, SEEK_END);
-    if (fileSize < 0) { writeStr(2,"lseek fail\n"); _exit(1); }
-    lseek(in_fd,0,SEEK_SET);
-
-    // allocate buffer with mmap (pure syscall)
-    char* buffer = (char*) mmap(NULL, blockSize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (buffer == MAP_FAILED) { writeStr(2,"alloc fail\n"); _exit(1); }
+    // Allocate buffer using mmap (pure syscall allocation)
+    char* buffer = (char*) mmap(NULL, blockSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (buffer == MAP_FAILED) {
+        fdWriteStr(2, "Failed to allocate memory buffer.\n");
+        close(fd_in);
+        close(fd_out);
+        _exit(1);
+    }
 
     off_t totalBlocks = (fileSize + blockSize - 1) / blockSize;
-    off_t processed = 0;
+    off_t blocksProcessed = 0;
 
-    while (processed < totalBlocks) {
-        ssize_t chunk = blockSize;
-        off_t left = fileSize - processed * blockSize;
-        if (left < blockSize) chunk = left;
-
-        ssize_t rbytes = 0;
-        while (rbytes < chunk) {
-            ssize_t r = read(in_fd, buffer + rbytes, chunk - rbytes);
-            if (r <= 0) break;
-            rbytes += r;
-        }
-        if (rbytes == 0) break;
-
-        for (ssize_t i=0;i<rbytes/2;i++) {
-            char t = buffer[i];
-            buffer[i] = buffer[rbytes-i-1];
-            buffer[rbytes-i-1] = t;
+    while (blocksProcessed < totalBlocks) {
+        ssize_t currentBlockSize = blockSize;
+        off_t remaining = fileSize - blocksProcessed * blockSize;
+        if (remaining < blockSize) {
+            currentBlockSize = remaining;
         }
 
-        ssize_t wbytes = 0;
-        while (wbytes < rbytes) {
-            ssize_t w = write(out_fd, buffer + wbytes, rbytes - wbytes);
-            if (w <= 0) break;
-            wbytes += w;
+        ssize_t totalRead = 0;
+        while (totalRead < currentBlockSize) {
+            ssize_t bytesRead = read(fd_in, buffer + totalRead, currentBlockSize - totalRead);
+            if (bytesRead == -1) {
+                fdWriteStr(2, "Error during read operation.\n");
+                munmap(buffer, blockSize);
+                close(fd_in);
+                close(fd_out);
+                _exit(1);
+            }
+            if (bytesRead == 0) {
+                break; // EOF
+            }
+            totalRead += bytesRead;
         }
 
-        processed++;
+        if (totalRead == 0) {
+            break;
+        }
 
-        // progress: \rProgress: XX%
-        write(1,"\rProgress: ",11);
-        writeInt(1,(int)((processed*100)/totalBlocks));
-        write(1,"%",1);
+        // Reverse bytes in buffer
+        for (ssize_t i = 0; i < totalRead / 2; i++) {
+            char temp = buffer[i];
+            buffer[i] = buffer[totalRead - i - 1];
+            buffer[totalRead - i - 1] = temp;
+        }
+
+        ssize_t totalWritten = 0;
+        while (totalWritten < totalRead) {
+            ssize_t bytesWritten = write(fd_out, buffer + totalWritten, totalRead - totalWritten);
+            if (bytesWritten == -1) {
+                fdWriteStr(2, "Error during write operation.\n");
+                munmap(buffer, blockSize);
+                close(fd_in);
+                close(fd_out);
+                _exit(1);
+            }
+            totalWritten += bytesWritten;
+        }
+
+        blocksProcessed++;
+
+        // Display progress on one line
+        char progressMsg[32];
+        int progressPercent = (int)((blocksProcessed * 100) / totalBlocks);
+        int pos = 0;
+        progressMsg[pos++] = '\r';
+        const char* prefix = "Progress: ";
+        for (int i = 0; prefix[i]; i++) {
+            progressMsg[pos++] = prefix[i];
+        }
+        // Convert percentage to digits
+        int p = progressPercent;
+        char digits[4];
+        int digitCount = 0;
+        if (p == 0) {
+            digits[digitCount++] = '0';
+        } else {
+            while (p > 0 && digitCount < 4) {
+                digits[digitCount++] = (p % 10) + '0';
+                p /= 10;
+            }
+        }
+        // Reverse digits to get correct order
+        for (int i = digitCount - 1; i >= 0; i--) {
+            progressMsg[pos++] = digits[i];
+        }
+        progressMsg[pos++] = '%';
+        progressMsg[pos] = '\0';
+
+        write(1, progressMsg, pos);
     }
 
-    write(1,"\n",1);
+    write(1, "\n", 1);
 
     munmap(buffer, blockSize);
-    close(in_fd);
-    close(out_fd);
+    close(fd_in);
+    close(fd_out);
     return 0;
 }
