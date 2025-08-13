@@ -180,7 +180,7 @@ int checkFlag1(const char* newFile, const char* oldFile, long chunkSize)
     long offset=0;
     char* buf_new=(char*)mmap(NULL,chunkSize,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
     char* buf_old=(char*)mmap(NULL,chunkSize,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
-    int ok = 1;
+    int ok=1;
     while(offset<fileSize)
     {
         long sz=(chunkSize<(fileSize-offset))?chunkSize:(fileSize-offset);
