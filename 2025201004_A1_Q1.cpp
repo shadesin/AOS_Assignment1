@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
     outputPath[pos]='\0';
 
     //Open output
-    int fd_out=open(outputPath,O_CREAT|O_WRONLY|O_TRUNC,0000);
+    int fd_out=open(outputPath,O_CREAT|O_WRONLY|O_TRUNC,0600);
     if(fd_out==-1)
     {
         fdWriteStr(2,"Failed to open output\n");
