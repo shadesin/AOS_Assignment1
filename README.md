@@ -8,7 +8,7 @@ No C++ standard library I/O functions (`cin`, `cout`, `fstream`, etc.) are used.
 
 ## Contents
 - **Q1** – Performs various types of file reversal using only Linux system calls.
-- **Q2** – alidates the output files/directories created by Q1 - checks permissions and verifies content correctness for all reversal types.
+- **Q2** – Validates the output files/directories created by Q1 - checks permissions and verifies content correctness for all reversal types.
 
 ---
 
@@ -37,7 +37,7 @@ g++ 2025201004_A1_Q2.cpp -o q2
 
 ### Examples
 ```bash
-# Block-wise reversal (size = 4 bytes per block)
+# Block-wise reversal
 ./q1 input.txt 0 4
 
 # Full reversal
@@ -100,14 +100,6 @@ Output will include:
 - File size match result  
 - Content correctness check  
 - 9 permission checks User, group, and others - for `read`, `write`, and `execute` privileges on new file, old file, and directory.
-
----
-
-## Notes
-- All reading/writing is performed with system calls only.
-- Code uses helper functions such as:
-  - `strLength()`, `convertToInt()`, `fdWriteStr()` in Q1
-  - `convertToLong()`, `fdWriteYesNo()` in Q2
 
 ---
 
