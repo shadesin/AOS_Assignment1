@@ -1,122 +1,116 @@
-# Assignment 1
-### Souradeep Das - 2025201004
+# Assignment 1 
+**Author:** Souradeep Das – 2025201004  
 
+This assigment contains two C++ programs written entirely using Linux system calls (`open`, `read`, `write`, `lseek`, `mmap`, `close`, etc.).  
+No C++ standard library I/O functions (`cin`, `cout`, `fstream`, etc.) are used.
 
-## Overview
+---
 
-This assignment has two main programs:
+## Contents
+- **Q1** – Performs various types of file reversal using only Linux system calls.
+- **Q2** – alidates the output files/directories created by Q1 - checks permissions and verifies content correctness for all reversal types.
 
-- **Q1**: Performs various types of file reversal using only Linux system calls.
-- **Q2**: Validates the output files/directories created by Q1 - checks permissions and verifies content correctness for all reversal types.
+---
 
+## Compilation
 
-***
+```bash
+g++ 2025201004_A1_Q1.cpp -o q1
+g++ 2025201004_A1_Q2.cpp -o q2
+```
 
-## How to Compile
+---
 
-Open a terminal in the assignment folder and type:
-
-`g++ 2025201004_A1_Q1.cpp -o q1`
-`g++ 2025201004_A1_Q2.cpp -o q2`
-
-
-***
-
-## Q1 - File Reversal & Processing
+## Q1 – File Reversal & Processing  
 
 ### Usage
+```bash
+./q1 <input_file> <flag> [extra arguments]
+```
 
-`./q1 <input_file> <flag> [extra arguments]`
+### Flags
+| Flag | Description | Extra Arguments |
+|------|-------------|-----------------|
+| `0`  | Block-wise reversal (each block reversed independently) | `<block_size>` |
+| `1`  | Full file reversal | None |
+| `2`  | Partial range reversal (before `start_index` and after `end_index` reversed, middle unchanged) | `<start_index> <end_index>` |
 
+### Examples
+```bash
+# Block-wise reversal (size = 4 bytes per block)
+./q1 input.txt 0 4
 
-- **flag 0 - Block-wise reversal:**
-  - Reverses each block of the input file separately.
-  - You must specify a positive integer block size.
+# Full reversal
+./q1 input.txt 1
 
-`./q1 input.txt 0 1024`
-
-
-- **flag 1 - Full file reversal:**
-- Reverses the entire file (byte order).
-- No extra arguments required.
-
-`./q1 input.txt 1`
-
-
-- **flag 2 - Partial range reversal:**
-- Reverses the bytes before a start index and after an end index, keeping the region between [start, end] untouched.
-- Requires two extra arguments: `start_index` and `end_index` (0-based indexing).
-
-`./q1 input.txt 2 5 10`
-
+# Partial range reversal
+./q1 input.txt 2 5 10
+```
 
 ### Output
+- All results are stored inside a directory named `Assignment1`.  
+- File naming convention:  
+  ```
+  Assignment1/<flag>_<inputfilename>
+  ```
+- **Directory permissions:** `700` (owner: read, write, execute)  
+- **File permissions:** `600` (owner: read, write)  
 
-- Output files are created in a sub-directory called **Assignment1**.
-- Naming pattern: 
-`Assignment1/<flag>_<inputfilename>`
+---
 
-For example, `Assignment1/0_file.txt`, `Assignment1/1_file.txt`, etc.
-
-### Notes
-
-- The program displays progress as a percentage.
-- All errors (bad arguments, read/write failures, memory issues) are reported to the terminal.
-- Only system calls are used. No commands like `ls`, `cp`, `mv`, or library I/O.
-
-***
-
-## Q2 - Validation & Permissions Checking
+## Q2 – Output Validation & Permission Checks  
 
 ### Usage
+```bash
+# For flag 0
+./q2 <new_file> <old_file> <dir_path> 0 <block_size>
 
-For Flag 0:
-`./q2 <new_file> <old_file> <dir_path> 0 <block_size>`
+# For flag 1
+./q2 <new_file> <old_file> <dir_path> 1
 
-For Flag 1:
-`./q2 <new_file> <old_file> <dir_path> 1`
+# For flag 2
+./q2 <new_file> <old_file> <dir_path> 2 <start_index> <end_index>
+```
 
-For Flag 2:
-`./q2 <new_file> <old_file> <dir_path> 2 <start_index> <end_index>`
+### What It Does
+1. **Directory check** – Confirms if the given directory exists and is valid.  
+2. **File size comparison** – Matches `new_file` and `old_file` sizes.  
+3. **Content verification** –  
+   - **Flag 0:** Each block in the new file is the reverse of the same block in the old file.  
+   - **Flag 1:** Entire file content is reversed.  
+   - **Flag 2:** Start and end segments reversed; middle section unchanged.  
+4. **Permission checks** – Verifies expected permissions for:  
+   - New file (`600`)  
+   - Old file (default `644`)  
+   - Directory (`700`)  
 
-
-#### Example (Flag 1):
-`./q2 Assignment1/1_file.txt file.txt Assignment1 1`
-
-
-### What Q2 Checks
-
-- **Whether file sizes match** between new file and original.
-- **Whether the reversal/copy transformation was performed correctly** (according to the flag).
-- **Whether the output directory exists.**
-- **Permissions checks:** User, group, and others - for `read`, `write`, and `execute` privileges on new file, old file, and directory.
-
-
-***
-
-## Code Structure & Comments
-
-- **Manual helpers** are used for string/integer operations (`str_len`, `to_long`, `write_str`, etc.).
-- **Memory allocation** is via `mmap` system call.
-- **All output** (progress, errors, 30-line checker output) uses `write()` directly.
-- **All permission checks** use only `stat()` and system macros.
-- **Error handling** is explicit and robust for all system calls.
-
-***
+---
 
 ## Example Workflow
+```bash
+# Step 1 – Transform file
+./q1 file.txt 2 5 10
+# Output -> Assignment1/2_file.txt
 
-`./q1 file.txt 2 2 7`
+# Step 2 – Validate transformation
+./q2 Assignment1/2_file.txt file.txt Assignment1 2 5 10
+```
+Output will include:  
+- Whether the directory exists
+- File size match result  
+- Content correctness check  
+- 9 permission checks User, group, and others - for `read`, `write`, and `execute` privileges on new file, old file, and directory.
 
-Produces Assignment1/2_file.txt
-`./q2 Assignment1/2_file.txt file.txt Assignment1 2 2 7`
+---
 
-Prints 30-line validation report
+## Notes
+- All reading/writing is performed with system calls only.
+- Code uses helper functions such as:
+  - `strLength()`, `convertToInt()`, `fdWriteStr()` in Q1
+  - `convertToLong()`, `fdWriteYesNo()` in Q2
 
-***
+---
 
 ## Contact
-
-For any clarifications, please contact - souradeep.das@students.iiit.ac.in.
-
-***
+For any clarifications, please contact:  
+`souradeep.das@students.iiit.ac.in`
