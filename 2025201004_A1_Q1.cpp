@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
             ssize_t wbytes=0;
             while(wbytes<rbytes)
             {
-                ssize_t w=write(fd_out,buffer+wbytes,rbytes=wbytes);
+                ssize_t w=write(fd_out,buffer+wbytes,rbytes-wbytes);
                 if(w<=0)
                 {
                     break;
